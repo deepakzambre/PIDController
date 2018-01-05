@@ -1,7 +1,9 @@
 #ifndef PID_H
 #define PID_H
 
-class PID {
+class PID
+{
+
 public:
   /*
   * Errors
@@ -13,9 +15,9 @@ public:
   /*
   * Coefficients
   */ 
-  double Kp;
-  double Ki;
-  double Kd;
+  double kp;
+  double ki;
+  double kd;
 
   /*
   * Constructor
@@ -30,7 +32,7 @@ public:
   /*
   * Initialize PID.
   */
-  void Init(double Kp, double Ki, double Kd);
+  void Init(double kp_in, double ki_in, double kd_in);
 
   /*
   * Update the PID error variables given cross track error.
