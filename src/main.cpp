@@ -13,7 +13,7 @@ using json = nlohmann::json;
 int INFO = 10;
 int DBG = 5;
 int CRITICAL = 1;
-int LOG_LEVEL = 3;
+int LOG_LEVEL = 3 ;
 
 #define LOG(w, x)                                                       \
   {                                                                     \
@@ -85,16 +85,28 @@ class Twiddler
 {
 public:
 
-  double kp;
-  double ki;
-  double kd;
-  double throttle;
+  long max_ts = 6000;
 
-  bool if_twiddle;
+  double kp = 0.126541;
+  double ki = 0.000000;
+  double kd = 3.982195;
+
+  double tkp = 12.521085;
+  double tki = 0.205891;
+  double tkd = -0.020000;
+
+  // works with constant throttle = 0.3
+  // double kp = 0.351117;
+  // double ki = 0.0;
+  // double kd = 6.358032;
+
+  double throttle = 0.3;
+
+  bool if_twiddle = false;
 
   vector<double> p;
   vector<double> dp;
-  double best_err = numeric_limits<double>::max();
+  double best_err = 1000; //numeric_limits<double>::max();
 
   long param_twiddled = 0;
   double err = 0;
@@ -102,12 +114,13 @@ public:
   double min_sum_dp = 0.2;
   Phase phase = Start;
 
-  long num_params = 3;
+  long num_params = 6;
   long it = 0;
 
   bool ignore_update = true;
 
   PID steer_pid;
+  PID throttle_pid;
 
   Twiddler(int argc, char* argv[]);
 
@@ -118,47 +131,139 @@ public:
   double GetSteering();
 
   void Reset();
+
+  string GetState();
+
+  void UpdateParams();
 };
 
 Twiddler::Twiddler(int argc, char* argv[])
 {
-  kp = 0.2;
-  ki = 0.004;
-  kd = 3.0;
-  throttle = 0.1;
-
-  if_twiddle = false;
-
   if (argc > 2)
   {
     if (!strcmp(argv[1], "yes") || !strcmp(argv[1], "y"))
     {
       if_twiddle = true;
     }
+  }
 
-    if (argc >= 5)
+  if (!if_twiddle)
+  {
+    max_ts = numeric_limits<long>::max();
+
+    if (argc == 6)
     {
       kp = atof(argv[2]);
       ki = atof(argv[3]);
       kd = atof(argv[4]);
-    }
-
-    if (argc == 6)
-    {
       throttle = atof(argv[5]);
-    }
-  }
 
-  if (if_twiddle)
-  {
-    for (int i = 0; i < num_params; i++)
+      num_params = 3;
+    }
+    else if (argc == 8)
     {
-      p.push_back(atof(argv[i + 2]));
-      dp.push_back(1.0);
-    }
+      kp = atof(argv[2]);
+      ki = atof(argv[3]);
+      kd = atof(argv[4]);
+      tkp = atof(argv[5]);
+      tki = atof(argv[6]);
+      tkd = atof(argv[7]);
 
-    steer_pid.Init(0, 0, 0);
+      num_params = 6;
+    }
   }
+  else
+  {
+    num_params = atoi(argv[2]);
+
+    if (num_params == 3)
+    {
+      p.push_back(atof(argv[3]));
+      p.push_back(atof(argv[4]));
+      p.push_back(atof(argv[5]));
+
+      kp = p.at(0);
+      ki = p.at(1);
+      kd = p.at(2);
+
+      dp.push_back(atof(argv[6]));
+      dp.push_back(atof(argv[7]));
+      dp.push_back(atof(argv[8]));
+
+      throttle = atof(argv[9]);
+    }
+    else if (num_params == 6)
+    {
+      p.push_back(atof(argv[3]));
+      p.push_back(atof(argv[4]));
+      p.push_back(atof(argv[5]));
+      p.push_back(atof(argv[6]));
+      p.push_back(atof(argv[7]));
+      p.push_back(atof(argv[8]));
+
+      kp = p.at(0);
+      ki = p.at(1);
+      kd = p.at(2);
+      tkp = p.at(3);
+      tki = p.at(4);
+      tkd = p.at(5);
+
+      dp.push_back(atof(argv[9]));
+      dp.push_back(atof(argv[10]));
+      dp.push_back(atof(argv[11]));
+      dp.push_back(atof(argv[12]));
+      dp.push_back(atof(argv[13]));
+      dp.push_back(atof(argv[14]));
+    }
+  }
+
+  steer_pid.Init(kp, ki, kd);
+  throttle_pid.Init(tkp, tki, tkd);
+}
+
+string
+Twiddler::GetState()
+{
+  string s = "it=" + to_string(it) + ",p=[";
+  for (int i = 0; i < num_params - 1; i++)
+  {
+    s += to_string(p[i]) + ",";
+  }
+
+  s += to_string(p[num_params - 1]) + "],dp=[";
+
+  for (int i = 0; i < num_params - 1; i++)
+  {
+    s += to_string(dp[i]) + ",";
+  }
+
+  s += to_string(dp[num_params - 1]) + "]";
+
+  s += ",best_err=" + to_string(best_err) + ",err=" + to_string(err);
+
+  return s;
+}
+
+void
+Twiddler::UpdateParams()
+{
+    best_err = err;
+    if (num_params == 3)
+    {
+      kp = p.at(0);
+      ki = p.at(1);
+      kd = p.at(2);
+    }
+    if (num_params == 6)
+    {
+      kp = p.at(0);
+      ki = p.at(1);
+      kd = p.at(2);
+
+      tkp = p.at(3);
+      tki = p.at(4);
+      tkd = p.at(5);
+    }
 }
 
 void
@@ -175,17 +280,21 @@ Twiddler::Reset()
   }
 
   err = err / ts;
-  LOG(CRITICAL, "Twiddle: it, kp, ki, kd, t, err=" + to_string(it) + "," + to_string(p[0]) + "," + to_string(p[1]) + "," + to_string(p[2]) + "," + to_string(throttle) + "," + to_string(err));
+  if (err < best_err)
+  {
+    LOG(CRITICAL, "Twiddle Updating:" + GetState());
+  }
+  else
+  {
+    LOG(CRITICAL, "Twiddle Ignoring:" + GetState());
+  }
 
   switch (phase)
   {
   case Start:
     LOG(INFO, "");
 
-    best_err = err;
-    kp = p.at(0);
-    ki = p.at(1);
-    kd = p.at(2);
+    UpdateParams();
 
     p.at(param_twiddled) += dp.at(param_twiddled);
     param_twiddled = param_twiddled % num_params;
@@ -201,12 +310,10 @@ Twiddler::Reset()
 
     if (err < best_err)
     {
-      best_err = err;
-      kp = p.at(0);
-      ki = p.at(1);
-      kd = p.at(2);
+      UpdateParams();
 
       dp.at(param_twiddled) *= 1.1;
+
       param_twiddled++;
       param_twiddled = param_twiddled % num_params;
 
@@ -228,10 +335,7 @@ Twiddler::Reset()
 
     if (err < best_err)
     {
-      best_err = err;
-      kp = p.at(0);
-      ki = p.at(1);
-      kd = p.at(2);
+      UpdateParams();
 
       dp.at(param_twiddled) *= 1.1;
 
@@ -269,15 +373,18 @@ Twiddler::Reset()
   if (sum_dp > min_sum_dp)
   {
     steer_pid.Init(p.at(0), p.at(1), p.at(2));
+    throttle_pid.Init(tkp, tki, tkd);
     it++;
   }
   else
   {
     LOG(CRITICAL, "Finished Twiddling");
     steer_pid.Init(kp, ki, kd);
+    throttle_pid.Init(tkp, tki, tkd);
   }
 
   ignore_update = true;
+  ts = 0;
 
   LOG(INFO, "Exit");
 }
@@ -287,19 +394,25 @@ Twiddler::UpdateState(double cte)
 {
   if (ignore_update)
   {
-    LOG(CRITICAL, "Ignoring");
+    LOG(INFO, "Ignoring");
 
     return true;
   }
 
-  LOG(INFO, "Enter");
+  LOG(INFO, "Enter " + to_string(ts) + ", cte=" + to_string(cte));
 
   ts++;
   err = err + (cte * cte);
   steer_pid.UpdateError(cte);
+  throttle_pid.UpdateError(abs(cte));
 
-  if (abs(cte) > 4.0)
+  if (if_twiddle && (ts > max_ts || abs(cte) > 4.0))
   {
+    if (abs(cte) > 4.0)
+    {
+      err += ((max_ts - ts) * cte * cte);
+    }
+
     Reset();
 
     LOG(INFO, "Exit");
@@ -328,7 +441,37 @@ Twiddler::GetSteering()
 double
 Twiddler::GetThrottle()
 {
-  return throttle;
+  if (num_params == 3)
+  {
+    return throttle;
+  }
+
+  LOG(INFO, "kp=" + to_string(throttle_pid.kp) + ",err=" + to_string(throttle_pid.p_error));
+  LOG(INFO, "ki=" + to_string(throttle_pid.ki) + ",err=" + to_string(throttle_pid.i_error));
+  LOG(INFO, "kd=" + to_string(throttle_pid.kd) + ",err=" + to_string(throttle_pid.d_error));
+
+  double t = 0.0;
+  double t1 = 0.0, t2 = 0.0, t3 = 0.0;
+  if (throttle_pid.p_error > 0.0001)
+  {
+    t1 = throttle_pid.kp / throttle_pid.p_error;
+  }
+
+  if (throttle_pid.i_error > 0.0001)
+  {
+    t2 = throttle_pid.ki / throttle_pid.i_error;
+  }
+
+  if (throttle_pid.d_error > 0.0001)
+  {
+    t3 = throttle_pid.kd / throttle_pid.d_error;
+  }
+  
+  t = min(max(-0.7, t1 + t2 + t3), 0.7);
+
+  LOG(INFO, "throttle=" + to_string(t));
+
+  return t;
 }
 
 int
@@ -369,6 +512,8 @@ main(int argc, char* argv[])
 
             double steer_value = twiddler.GetSteering();
             double throttle = twiddler.GetThrottle();
+
+            LOG(INFO, to_string(steer_value) + " " + to_string(throttle));
 
             json msgJson;
             msgJson["steering_angle"] = steer_value;
@@ -419,7 +564,7 @@ main(int argc, char* argv[])
     (uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req)
     {
       twiddler.ignore_update = false;
-      LOG(CRITICAL, "Connected");
+      LOG(INFO, "Connected");
     });
 
   h.onDisconnection(
@@ -427,7 +572,7 @@ main(int argc, char* argv[])
     (uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length)
     {
       ws.close();
-      LOG(CRITICAL, "Disconnected");
+      LOG(INFO, "Disconnected");
     });
 
   int port = 4567;

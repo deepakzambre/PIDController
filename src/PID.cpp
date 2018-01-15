@@ -1,4 +1,5 @@
 #include "PID.h"
+#include <math.h>
 
 using namespace std;
 
@@ -16,18 +17,14 @@ PID::Init(double kp_in, double ki_in, double kd_in)
   kp = kp_in;
   ki = ki_in;
   kd = kd_in;
-
-  p_error = 0;
-  i_error = 0;
-  d_error = 0;
 }
 
 void
 PID::UpdateError(double cte)
 {
+  d_error = cte - p_error;
   p_error = cte;
-  i_error += cte;
-  d_error = cte - d_error;
+  i_error = i_error + cte;
 }
 
 double
