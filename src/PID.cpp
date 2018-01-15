@@ -17,6 +17,10 @@ PID::Init(double kp_in, double ki_in, double kd_in)
   kp = kp_in;
   ki = ki_in;
   kd = kd_in;
+
+  d_error = 0;
+  p_error = 0;
+  i_error = 0;
 }
 
 void
