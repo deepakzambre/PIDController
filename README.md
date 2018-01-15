@@ -1,7 +1,74 @@
 # CarND-Controls-PID
 Self-Driving Car Engineer Nanodegree Program
-
 ---
+## Overview
+
+This project uses PID controller to control vehicle steering and throttle. It also implements [twiddle](https://www.youtube.com/watch?v=2uQ2BSzDvXs) algorithm that can be used for parameter tuning. More information about how to enable/disable twiddle mode can be found in *Usage* section.
+
+### PID controller component effects on steering
+
+Details on **P**roportional-**I**ntegrative-**D**erivative controller can be found [here](https://en.wikipedia.org/wiki/PID_controller).
+
+* **P**roportional component
+
+  Directly depends on `cte[cross-track error]`. Causes large steer correction to be applied when car is further away from track midpoint; at high speed, this results in instability / oscillation.
+
+* **I**ntegrative component
+
+  This component is used to deal with systematic bias of a system. PD controller cannot apply correction when there is residual error in system, e.g.: a car oversteering / understeering. _Integrative component_ is useful in such cases since it applies correction for residual system error.
+
+* **D**erivative component
+
+  This component is proportional to error's rate of change and hence acts as smoothing factor for P-component, e.g. if too much steering is caused from P-component while cross-track error rate is continuously decreasing then it is advisable to decrease steering else we will oversteer.
+
+### PID controller for throttle
+
+This project also implements PID controller for throttle control. Instead of PID components being directly proportional to cross-track error as in case of steering PID, for throttle PID, we have PID components inversely proportional to cross-track error.
+
+### Usage
+`pid` binary can be run in various modes as below:
+* **Run with default configuration**
+
+  `.\pid`
+
+  Runs PID controller with pre-tuned parameters. Following are the pre-tuned values being used
+  ```
+  steer_kp = 0.126541
+  steer_ki = 0.000000
+  steer_kd = 3.982195
+
+  throttle_kp = 12.521085
+  throttle_ki = 0.205891
+  throttle_kd = -0.020000
+  ```
+  Additionally, we can use constant `throttle = 0.3` with following pre-tuned values for steer PID
+  ```
+  kp = 0.351117
+  ki = 0.0
+  kd = 6.358032
+  ```
+  Above constant throttle  configuration can be run as `.\pid n 0.351117 0.0 6.358032 0.3`
+* **Twiddle = false, use steer PID with constant throttle**
+
+  `.\pid n <steer_kp>  <steer_ki>  <steer_kd> <throttle value>`
+
+  Second parameter is used to indicate if twiddling should be enabled. Possible values are yes/y/no/n.
+
+  Sample cmdline to use steer PID with constant throttle `.\pid n 0.351117 0.0 6.358032 0.3`
+* **Twiddle = false, use steer and throttle PID**
+
+  `.\pid n <steer_kp>  <steer_ki>  <steer_kd> <throttle_kp> <throttle_ki> <throttle_kd>`
+
+  Second parameter is used to indicate if twiddling should be enabled. Possible values are yes/y/no/n.
+
+  Sample cmdline to use steer and throttle PID `.\pid n 0.351117 0.0 6.358032 12.521085 0.205891 -0.020000`
+* **Twiddle = true, use steer PID with constant throttle**
+
+  `.\pid y 3 <steer_kp>  <steer_ki>  <steer_kd> <steer_dkp>  <steer_dki>  <steer_dkd> <throttle value>`
+
+* **Twiddle = true, use steer and throttle PID**
+
+  `.\pid y 6 <steer_kp>  <steer_ki>  <steer_kd> <throttle_kp> <throttle_ki> <throttle_kd> <steer_dkp>  <steer_dki>  <steer_dkd> <throttle_dkp> <throttle_dki> <throttle_dkd>`
 
 ## Dependencies
 
@@ -19,7 +86,7 @@ Self-Driving Car Engineer Nanodegree Program
   * Run either `./install-mac.sh` or `./install-ubuntu.sh`.
   * If you install from source, checkout to commit `e94b6e1`, i.e.
     ```
-    git clone https://github.com/uWebSockets/uWebSockets 
+    git clone https://github.com/uWebSockets/uWebSockets
     cd uWebSockets
     git checkout e94b6e1
     ```
@@ -33,7 +100,7 @@ There's an experimental patch for windows in this [PR](https://github.com/udacit
 1. Clone this repo.
 2. Make a build directory: `mkdir build && cd build`
 3. Compile: `cmake .. && make`
-4. Run it: `./pid`. 
+4. Run it: `./pid`.
 
 Tips for setting up your environment can be found [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
 
@@ -95,4 +162,3 @@ still be compilable with cmake and make./
 
 ## How to write a README
 A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
-
